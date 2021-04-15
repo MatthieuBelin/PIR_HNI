@@ -1,6 +1,6 @@
 # Projet d'initiation à la recherche : Hydrodynamique numérique
 
-Groupe 1 : Mathis Antonetti, Mathilde Lemoin, Jim Vende --> solver python + théorie math
+Groupe 1 : Mathis Antonetti, Mathilde Lemoin, Jim Vende $\rihtarrow$ solver python + théorie math
 
 Groupe 2 : Matthieu Belin, Clara Naxosia, Josua Garon --> solver Basilisk (avec maillage adaptatif) + données batymétriques + données bouées DART
 
