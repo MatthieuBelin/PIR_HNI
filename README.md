@@ -9,3 +9,8 @@ Etablissement : ENPC
 ## Motivation
 
 Nous voulons modéliser numériquement le tsunami de Tohuku grace aux équations de Saint-Venant.
+
+
+## Groupe 1
+
+Pour exécuter les codes qui sont écrits grace a Basilisk, une bibliothèque C, il faut télécharger aussi le Makefile puis taper dans le terminal "make solver.tst"
