@@ -110,11 +110,11 @@ event solve (i++) {
 			Fhu.x.x[] = F2;
 			Fhu.y.x[] = (F1 > 0. ? F1*vL : F1*vR);  // HLLC
 			// Source term
-            zminushalf = max(zb[-1], zb[]);
-            zplushalf = max(zb[], zb[+1]);
-            hminushalf = max(0, h[] + zb[] - zminushalf);
-            hplushalf = max(0, h[] + zb[] - zplushalf);
-            s.x[] = g/2*(hplushalf*hplushalf - hminushalf*hminushalf);
+            		zminushalf = max(zb[-1], zb[]);
+            		zplushalf = max(zb[], zb[+1]);
+            		hminushalf = max(0, h[] + zb[] - zminushalf);
+            		hplushalf = max(0, h[] + zb[] - zplushalf);
+            		s.x[] = g/2*(hplushalf*hplushalf - hminushalf*hminushalf);
 
 			vmax = max(vmax, vmax_loc);
 		} else {
