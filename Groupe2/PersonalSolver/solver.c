@@ -7,6 +7,7 @@
 //==============================Constants==============================
 
 scalar h[]; // Height of the water
+scalar zb[]; // Bathymetrie
 vector u[]; // Speed in x and y direction
 face vector fh[];
 tensor fu[];
@@ -65,6 +66,7 @@ event init(t = 0) {
 	foreach() {
 		dist = sqrt(x*x + y*y);
 		h[] = dist < 1. ? 4. : 1.;
+		zb[] = 0.;
 		u.x[] = 0.;
 		u.y[] = 0.;
 	}
@@ -91,6 +93,9 @@ event solve (i++) {
 	
 	// Fluxes
 	double vmax = 0.;
+	// Source term
+	face vector s[];
+	double zminushalf, zplushalf, hminushalf, hplushalf; // z[i-1/2], z[i+1/2], h[i-1/2+], h[i+1/2-]
 	foreach_face() {
 		// Face in x AND y directions
 		double hL = h[-1], uL = u.x[-1], vL = u.y[-1]; // left value
@@ -104,6 +109,13 @@ event solve (i++) {
 			Fh.x[] = F1;
 			Fhu.x.x[] = F2;
 			Fhu.y.x[] = (F1 > 0. ? F1*vL : F1*vR);  // HLLC
+			// Source term
+            zminushalf = max(zb[-1], zb[]);
+            zplushalf = max(zb[], zb[+1]);
+            hminushalf = max(0, h[] + zb[] - zminushalf);
+            hplushalf = max(0, h[] + zb[] - zplushalf);
+            s.x[] = g/2*(hplushalf*hplushalf - hminushalf*hminushalf);
+
 			vmax = max(vmax, vmax_loc);
 		} else {
 			Fh.x[] = Fhu.x.x[] = Fhu.y.x[] = 0.;
@@ -134,7 +146,7 @@ event solve (i++) {
 			foreach_dimension() { // u, v
 				double FhuL = Fhu.x.x[]  + Fhu.x.y[]; // left + bottom
 				double FhuR = Fhu.x.x[1,0] + Fhu.x.y[0,1]; // right + top 
-				double hu = h_old*u.x[] - (dt/DX)*(FhuR - FhuL);
+				double hu = h_old*u.x[] - (dt/DX)*(FhuR - FhuL + s.x[]);
 				u.x[] = hu/h[];
 			}
 		} else { // dry ==> set u = v = 0
@@ -148,9 +160,9 @@ event end (t = TMAX) {
 	return 1;
 }
 
-event adapt (i++) {
-	adapt_wavelet ({h}, (double []){4e-3}, maxlevel = level);
-}
+//event adapt (i++) {
+//	adapt_wavelet ({h}, (double []){4e-3}, maxlevel = level);
+//}
 
 //==============================Main function==============================
 
