@@ -75,11 +75,11 @@ event init(t = 0) {
 		u.x[] = 0.;
 		u.y[] = 0.;
 
-        dist = sqrt(x*x + y*y); // for the wave
-        dist2 = sqrt((y-2)*(y-2)); // for the wall
+        	dist = sqrt(x*x + y*y); // for the wave
+        	dist2 = sqrt((y-2)*(y-2)); // for the wall
 
-        zb[] = dist2 < 0.1 ? 14. : 0.;
-        h[] = dist < 1. ? 4. : 1.;
+        	zb[] = dist2 < 0.1 ? 14. : 0.;
+        	h[] = dist < 1. ? 4. : 1.;
 	}
 	
 	DX = (L0/N); // cartesian grid
