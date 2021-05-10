@@ -1,18 +1,25 @@
+// qcc -O2 -Wall solver.c -o solver -lm
+
 #include "grid/quadtree.h"
 #include "paraview2d.h"
 #include "run.h"
 
-#define TMAX 5.
+//double TMAX = 5.;
 
 //==============================Constants==============================
 
 scalar h[]; // Height of the water
 scalar zb[]; // Bathymetrie
+scalar zs[]; // Free surface
 vector u[]; // Speed in x and y direction
 face vector fh[];
 tensor fu[];
 
 double g = 9.81;
+
+double h0, a, r0;
+double omega;
+double TMAX;
 
 double DX;
 double dry = 1.e-10;
@@ -35,16 +42,18 @@ void HLL (double hG, double uL, double zL, double hD, double uR, double zR, doub
     double hL = max(0, hG + zL - zi);
     double hR = max(0, hD + zR - zi);
 
-    if (max(hR, hL) < dry) {
-        *F1, *F2L, *F2R = 0., 0., 0.;
-        return;
-    }
-
 	// wave speeds
 	double sL = min(uL - sqrt(g*hL), uR - sqrt(g*hR));
 	double sR = max(uL + sqrt(g*hL), uR + sqrt(g*hR));
-	*vmax = max(abs(sL), abs(sR));
-	
+	*vmax = max(fabs(sL), fabs(sR));
+
+    if (max(hR, hL) < dry) {
+        *F1 = 0.;
+        *F2L = 0.;
+        *F2R = 0.;
+        return;
+    }
+
 	// fluxes
 	double f1L, f2L;
 	flux(hL, uL, &f1L, &f2L);
@@ -74,9 +83,9 @@ void HLL (double hG, double uL, double zL, double hD, double uR, double zR, doub
 event init(t = 0) {
 	// Initial conditions
 
-	double h0 = 0.1, a = 1, r0 = 0.8;
-	double omega = sqrt(8*g*h0)/a;
-	double T = 3*2*M_PI/omega;
+	L0 = 4.;
+	X0 = 0.;
+	Y0 = 0.;
     double A = (a*a - r0*r0)/(a*a + r0*r0);
 
 	// Riemann problem
@@ -92,13 +101,14 @@ event init(t = 0) {
 //        h[] = dist < 1. ? 4. : 1.;
 //	}
 
-    double r2, z_actu;
+    // Radially-symmetrical paraboloid
+    double r2;
     foreach() {
         r2 = (x-L0/2.)*(x-L0/2.) + (y-L0/2.)*(y-L0/2.);
         zb[] = -h0 * (1.-(r2/(a*a)));
 
-        z_actu = zb[];
-        h[] = max(0., h0*(sqrt(1-A*A)/(1-A) - 1 - r2/(a*a) * ( (1-A*A)/((1-A*A)*(1-A*A)) - 1)) - z_actu);
+        h[] = max(0., h0*(sqrt(1.-A*A)/(1.-A) - 1. - r2/(a*a) * ((1.-A*A)/((1.-A)*(1.-A)) - 1.)) - zb[]);
+        zs[] = zb[] + h[];
 
         u.x[] = 0.;
         u.y[] = 0.;
@@ -107,17 +117,17 @@ event init(t = 0) {
 	DX = (L0/N); // cartesian grid
 }
 
-event plot (i++) {
+event plot (t += 0.1) {
 	fprintf (stdout, "# t = %g\n", t); // time
 	// paraview
-	output_paraview (slist = {h, zb}, vlist = {u});
+	output_paraview (slist = {h, zb, zs}, vlist = {u});
 }
 
 event solve (i++) {	
 	// Compute the solution for this iteration
 
 	// Neumann boundary condition
-	boundary ({zb, h, u});
+	boundary ({zs, zb, h, u});
 
 	// Fluxes at interfaces
 	face vector Fh[];	// Fh.x,	Fh.y
@@ -168,7 +178,8 @@ event solve (i++) {
 		double FhL = Fh.x[]  + Fh.y[]; // left + bottom
 		double FhR = Fh.x[1,0] + Fh.y[0,1]; // right + top 
 		h[] += - (dt/DX)*(FhR - FhL); // h at t = t^{n+1}
-    
+        zs[] = h[] + zb[];
+
 		// update u,v
 		if (h[] > dry) {
 			foreach_dimension() { // u, v
@@ -198,11 +209,17 @@ int main() {
 	// resolution
 	// if (argc > 1) level = atoi(argv[1]);
 
-	// domain
+	// Default domain
 	g = 1.; 
-	L0 = 4.;
-	X0 = 0.; Y0 = 0.;
+	L0 = 6.;
+	X0 = -L0/2.; Y0 = -L0/2.;
 	N = 1 << level; // 2^6
 	CFL = 0.4;
+
+    // Radially-symmetrical paraboloid
+    h0 = 0.1, a = 1, r0 = 0.8;
+    omega = sqrt(8.*g*h0)/a;
+    TMAX = 3.*2.*M_PI/omega;
+
 	run();
 }
