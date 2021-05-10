@@ -12,7 +12,7 @@ vector u[]; // Speed in x and y direction
 face vector fh[];
 tensor fu[];
 
-double g = 1.;
+double g = 9.81;
 
 double DX;
 double dry = 1.e-10;
@@ -34,6 +34,11 @@ void HLL (double hG, double uL, double zL, double hD, double uR, double zR, doub
     double zi = max(zL, zR);
     double hL = max(0, hG + zL - zi);
     double hR = max(0, hD + zR - zi);
+
+    if (max(hR, hL) < dry) {
+        *F1, *F2L, *F2R = 0., 0., 0.;
+        return;
+    }
 
 	// wave speeds
 	double sL = min(uL - sqrt(g*hL), uR - sqrt(g*hR));
@@ -69,23 +74,40 @@ void HLL (double hG, double uL, double zL, double hD, double uR, double zR, doub
 event init(t = 0) {
 	// Initial conditions
 
+	double h0 = 0.1, a = 1, r0 = 0.8;
+	double omega = sqrt(8*g*h0)/a;
+	double T = 3*2*M_PI/omega;
+    double A = (a*a - r0*r0)/(a*a + r0*r0);
+
 	// Riemann problem
-	double dist, dist2;
-	foreach() {
-		u.x[] = 0.;
-		u.y[] = 0.;
+//	double dist, dist2;
+//	foreach() {
+//		u.x[] = 0.;
+//		u.y[] = 0.;
+//
+//        dist = sqrt(x*x + y*y); // for the wave
+//        dist2 = sqrt((y-2)*(y-2)); // for the wall
+//
+//        zb[] = dist2 < 0.1 ? 14. : 0.;
+//        h[] = dist < 1. ? 4. : 1.;
+//	}
 
-        	dist = sqrt(x*x + y*y); // for the wave
-        	dist2 = sqrt((y-2)*(y-2)); // for the wall
+    double r2, z_actu;
+    foreach() {
+        r2 = (x-L0/2.)*(x-L0/2.) + (y-L0/2.)*(y-L0/2.);
+        zb[] = -h0 * (1.-(r2/(a*a)));
 
-        	zb[] = dist2 < 0.1 ? 14. : 0.;
-        	h[] = dist < 1. ? 4. : 1.;
-	}
-	
+        z_actu = zb[];
+        h[] = max(0., h0*(sqrt(1-A*A)/(1-A) - 1 - r2/(a*a) * ( (1-A*A)/((1-A*A)*(1-A*A)) - 1)) - z_actu);
+
+        u.x[] = 0.;
+        u.y[] = 0.;
+    }
+
 	DX = (L0/N); // cartesian grid
 }
 
-event plot (t += 0.1) {
+event plot (i++) {
 	fprintf (stdout, "# t = %g\n", t); // time
 	// paraview
 	output_paraview (slist = {h, zb}, vlist = {u});
@@ -93,21 +115,21 @@ event plot (t += 0.1) {
 
 event solve (i++) {	
 	// Compute the solution for this iteration
-	
+
 	// Neumann boundary condition
-	boundary ({h, u});
-	
+	boundary ({zb, h, u});
+
 	// Fluxes at interfaces
 	face vector Fh[];	// Fh.x,	Fh.y
 	tensor FhuL[], FhuR[];		// Fhu.x.x	Fhu.x.y
 				// Fhu.y.x	Fhu.y.y
-	
+
 	// Fluxes
 	double vmax = 0.;
 	foreach_face() {
 		// Face in x AND y directions
 		double hL = h[-1], zL = zb[-1], uL = u.x[-1], vL = u.y[-1]; // left value
-		double hR = h[], zR = zb[], uR = u.x[],   vR = u.y[];   // right value
+		double hR = h[], zR = zb[], uR = u.x[], vR = u.y[];   // right value
 		if (hL > dry || hR > dry) {
 			// F(W_L,W_R) = (F1, F2)
 			double F1, F2L, F2R, vmax_loc;
@@ -125,7 +147,9 @@ event solve (i++) {
 			Fh.x[] = FhuL.x.x[] = FhuL.y.x[] = FhuR.x.x[] = FhuR.y.x[] = 0.;
 		}
 	}
-	
+
+	boundary_flux ({Fh, FhuL, FhuR});
+
 	// Timestep under CFL
 	DT = CFL*DX/fabs(vmax);
 	
@@ -176,8 +200,8 @@ int main() {
 
 	// domain
 	g = 1.; 
-	L0 = 6.;   
-	X0 = -L0/2.; Y0 = -L0/2.;
+	L0 = 4.;
+	X0 = 0.; Y0 = 0.;
 	N = 1 << level; // 2^6
 	CFL = 0.4;
 	run();
