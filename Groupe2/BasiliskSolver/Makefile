@@ -1,2 +1,2 @@
 CFLAGS += -O2
-include $(BASILIS)/Makefile.defs
+include $(BASILISK)/Makefile.defs
