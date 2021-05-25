@@ -4,23 +4,20 @@
 #include "paraview2d.h"
 #include "run.h"
 
+//#include "terrain.h"
 
 //==============================Variables==============================
 
 scalar h[]; // Height of the water
 scalar zb[]; // Bathymetrie
-scalar zs[]; // Free surface
 vector u[]; // Speed in x and y direction
-face vector fh[];
-tensor fu[];
 
 double g = 9.81;
 
 double TMAX = 1.;
 
-double DX;
 double dry = 1.e-10;
-int level = 6;
+int level = 7;
 
 //==============================Main function==============================
 
@@ -37,8 +34,7 @@ int main(int argc, char * argv[]) {
     X0 = 0.;
     Y0 = 0.;
 
-    N = 1 << level; // 2^6
-    init_grid(N);
+    init_grid(1 << level);
     CFL = 0.4;
     run();
 }
@@ -49,9 +45,9 @@ u.n[bottom] = neumann(0.); u.n[top] = neumann(0.);
 
 //==============================Functions for the solver==============================
 
-void flux (double h1, double u1, double *flux1, double *flux2) {
-	*flux1 = h1*u1;
-	*flux2 = h1*u1*u1 + g*h1*h1/2.;
+void flux (double h, double u, double *flux1, double *flux2) {
+	*flux1 = h*u;
+	*flux2 = h*u*u + g*h*h/2.;
 }
 
 // Roe's state
@@ -82,7 +78,6 @@ void HLL (double hL, double uL, double hR, double uR, double *F1, double *F2, do
 	double f1R, f2R;
 	flux(hR, uR, &f1R, &f2R);
 
-//	double F2;
 	if (0. < sL) {
 		*F1 = f1L;
 		*F2 = f2L;
@@ -95,68 +90,60 @@ void HLL (double hL, double uL, double hR, double uR, double *F1, double *F2, do
 	    *F1 = (sR*f1L - sL*f1R)/(sR-sL) + sL*sR*(hR - hL)/(sR-sL);
         *F2 = (sR*f2L - sL*f2R)/(sR-sL) + sL*sR*(hR*uR - hL*uL)/(sR-sL);
 	}
-//
-//	*F2L = F2 + 0.5*g*(hG*hG - hL*hL);
-//    *F2R = F2 + 0.5*g*(hD*hD - hR*hR);
 }
 
 //==============================Events to solve==============================
 
-/* FOR MESH ADAPTATION (see http://basilisk.fr/src/saint-venant.h) */
-event defaults (i=0) {
-    // default initial condition
-    foreach () {
-        for (scalar s in {h,u,zb}) {
-            s[] = 0.; // initial condition
-        }
-    }
-
-    // for refine/coarsen
-    for (scalar s in {h,u,zb}) {
-        // see http://basilisk.fr/src/grid/multigrid-common.h
-        s.refine = s.prolongation = refine_linear; // refine
-        s.restriction = restriction_volume_average; // coarsen
-    }
-}
-/* END MESH ADAPTATION */
-
-event init(t = 0) {
+event init(i = 0) {
 	// Initial conditions
 
+	/* Tohoku Tsunami */
+//    terrain (zb, "/home/matthieu/Documents/Solver_SV2D/terrain/etopo2", "/home/matthieu/Documents/Solver_SV2D/terrain/srtm_japan", NULL);
+//    foreach() {
+//        h[] = max(0., -zb[]);
+//    }
+//    boundary({h});
+//
+//    u.n[left]   = - radiation(0);
+//    u.n[right]  = + radiation(0);
+//    u.t[bottom] = - radiation(0);
+//    u.t[top]    = + radiation(0);
+
 	/* dam-break */
-	double dist, dist2;
-	foreach() {
-		u.x[] = 0.;
-		u.y[] = 0.;
-
-        dist = sqrt(x*x + y*y); // for the wave
-        dist2 = sqrt((y-2)*(y-2)); // for the wall
-
-        zb[] = dist2 < 0.1 ? 14. : 0.;
-        h[] = dist < 1. ? 4. : 1.;
-	}
+//	double dist, dist2;
+//	foreach() {
+//		u.x[] = 0.;
+//		u.y[] = 0.;
+//
+//        dist = sqrt(x*x + y*y); // for the wave
+//        dist2 = sqrt((y-2)*(y-2)); // for the wall
+//
+//        zb[] = dist2 < 0.1 ? 14. : 0.;
+//        h[] = dist < 1. ? 4. : dist2 < 0.1 ? 0.: 1.;
+//	}
 
 //    // Radially-symmetrical paraboloid
-//
-//    const double h0 = 0.1, a = 1., r0 = 0.8;
-//    double A = (a*a - r0*r0)/(a*a + r0*r0);
-//    double omega = sqrt(8.*g*h0)/a;
-//    TMAX = 3.*2.*M_PI/omega;
-//
-//    foreach() {
-//        double r2 = (x-L0/2.)*(x-L0/2.) + (y-L0/2.)*(y-L0/2.);
-//        zb[] = -h0 * (1.-(r2/(a*a)));
-//        double eta = h0*(sqrt(1.-A*A)/(1.-A) - 1. - r2/(a*a) * ((1.-A*A)/((1.-A)*(1.-A)) - 1.));
-//        h[] = max(0., eta - zb[]);
-//        zs[] = zb[] + h[];
-//
-//        u.x[] = u.y[] = 0.;
-//    }
+    /* Thacker without friction */
+    const double h0 = 0.1, a = 1., r0 = 0.8;
+    double A = (a*a - r0*r0)/(a*a + r0*r0);
+    double omega = sqrt(8.*g*h0)/a;
+    TMAX = 3.*2.*M_PI/omega;
+    foreach() {
+        double r2 = (x-L0/2.)*(x-L0/2.) + (y-L0/2.)*(y-L0/2.);
+        double eta = h0*(sqrt(1.-A*A)/(1.-A) - 1. - r2/(a*a)
+                        * ((1.-A*A)/((1.-A)*(1.-A)) - 1.));
+        zb[] = -h0 * (1.-(r2/(a*a)));
+        h[] = max(0., eta - zb[]);
+        u.x[] = u.y[] = 0.;
+    }
+
 }
 
-event plot (t <= TMAX; t += 0.1) {
+event plot (t <= TMAX; t += 0.05) {
 	fprintf (stdout, "# t = %g\n", t); // time
 	// paraview
+	scalar zs[];
+	foreach() zs[] = h[] + zb[];
 	output_paraview (slist = {h, zs, zb}, vlist = {u});
 }
 
@@ -169,14 +156,11 @@ event integration (i++) {
 	// Compute the solution for this iteration
 
 	// Neumann boundary condition
-	boundary ({zs, zb, h, u});
+	boundary ({h, u, zb});
 
 	// Fluxes at interfaces
 	face vector Fh[];	// Fh.x,	Fh.y
-	//tensor FhuL[], FhuR[];		// Fhu.x.x	Fhu.x.y
-				// Fhu.y.x	Fhu.y.y
-	//face vector FhuL[], FhuR[], Fhv[]; // Car l'antidiagonale est identique pour les deux tenseurs
-    tensor Fhu[];   // FhuL.x.x, Fhu.x.y
+	tensor Fhu[];   // FhuL.x.x, Fhu.x.y
                     // Fhu.y.x,  FhuR.y.y
     face vector Fhv[]; // Fhv = FhuR.x.x, FhuR.y.y
 
@@ -198,13 +182,13 @@ event integration (i++) {
 			// F(W_L,W_R) = (F1, F2)
 			double F1, F2, F3, vmax;
 			// numerical flux
-			HLL (hM, uM, hP, uP, &F1, &F2, &vmax); //(hL, uL, zL, hR, uR, zR, &F1, &F2L, &F2R, &vmax_loc);
+			HLL (hM, uM, hP, uP, &F1, &F2, &vmax);
 			// get fluxes
             F3 = (F1 > 0. ? F1*vM : F1*vP);  // HLLC
 			Fh.x[] = fm.x[] * F1;
-			Fhu.x.x[] = fm.x[] * (F2 - sM);
+			Fhu.x.x[] = fm.x[] * (F2 - sM); // FhuL
             Fhu.y.x[] = fm.x[] * F3;
-			Fhv.x[] = fm.x[] * (F2 + sP);
+			Fhv.x[] = fm.x[] * (F2 + sP); // FhuR
 
 			// Time step
 			double dxloc = Delta*cm[]/fm.x[];
@@ -218,7 +202,7 @@ event integration (i++) {
 
 	// next timestep
 	double dt = dtnext(dtmax);
-	
+
 	// Update
 	foreach() {
 	    double dxloc = cm[]*Delta; // size of the cell
@@ -232,7 +216,6 @@ event integration (i++) {
 		double FhL = Fh.x[]  + Fh.y[]; // left + bottom
 		double FhR = Fh.x[1,0] + Fh.y[0,1]; // right + top 
 		h[] = h_old - (dt/dxloc)*(FhR - FhL); // h at t = t^{n+1}
-        zs[] = h[] + zb[];
 
 		// update u,v
 		if (h[] > dry) {
@@ -247,3 +230,21 @@ event integration (i++) {
 		}
 	}
 }
+
+/* FOR MESH ADAPTATION (see http://basilisk.fr/src/saint-venant.h) */
+event defaults (i=0) {
+    // default initial condition
+    foreach () {
+        for (scalar s in {h,u,zb}) {
+            s[] = 0.; // initial condition
+        }
+    }
+
+    // for refine/coarsen
+    for (scalar s in {h,u,zb}) {
+        // see http://basilisk.fr/src/grid/multigrid-common.h
+        s.refine = s.prolongation = refine_linear; // refine
+        s.restriction = restriction_volume_average; // coarsen
+    }
+}
+/* END MESH ADAPTATION */
