@@ -2,6 +2,11 @@
 // Created by matthieu on 25/05/2021.
 //
 
+// Pour compiler il faut exécuter la ligne suivante
+// make main.tst
+// Peut importe ce qui est écrit, pour executer le fichier, il faut faire la ligne suivante
+// ./main/main
+
 #include "spherical.h"
 #include "layered/hydro.h"
 #include "layered/nh.h"
